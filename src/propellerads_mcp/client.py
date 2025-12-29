@@ -15,7 +15,7 @@ class PropellerAdsError(Exception):
 
 class CampaignFilter(BaseModel):
     """Filter for listing campaigns."""
-    status: str | None = None
+    status: list[int] | None = None
     ad_format: str | None = None
     name: str | None = None
 
@@ -27,6 +27,19 @@ class StatisticsParams(BaseModel):
     group_by: list[str] | None = None
     campaign_id: int | None = None
     zone_id: int | None = None
+
+
+# Campaign status codes
+STATUS_MAP = {
+    1: "Draft",
+    2: "Moderation",
+    3: "Rejected",
+    4: "Ready",
+    6: "Working",  # Active/Running
+    7: "Paused",
+    8: "Stopped",  # Archived
+    9: "Completed"
+}
 
 
 class PropellerAdsClient:
@@ -102,22 +115,51 @@ class PropellerAdsClient:
 
     def list_campaigns(
         self,
-        status: str | None = None,
-        ad_format: str | None = None,
-        name: str | None = None,
+        status: list[int] | None = None,
+        is_archived: int | None = 0,
+        limit: int = 20,
+        formats: list[str] | None = None,
+        page: int = 1,
+        page_size: int = 100,
     ) -> list[dict[str, Any]]:
-        """List all campaigns with optional filters."""
-        params = {}
+        """List campaigns with optional filters.
+        
+        Args:
+            status: List of status codes (1=Draft, 2=Moderation, 3=Rejected, 
+                    4=Ready, 6=Working, 7=Paused, 8=Stopped, 9=Completed)
+            is_archived: 0=not archived, 1=archived, None=all
+            limit: Maximum number of campaigns to return (applied after sorting)
+            formats: List of ad formats to filter
+            page: Page number for API pagination
+            page_size: Page size for API pagination (max 100)
+        """
+        params = {
+            "page": page,
+            "page_size": min(page_size, 100)  # API max is 100
+        }
+        
         if status:
-            params["status"] = status
-        if ad_format:
-            params["ad_format"] = ad_format
-        if name:
-            params["name"] = name
+            for i, s in enumerate(status):
+                params[f"status[{i}]"] = s
+        
+        if is_archived is not None:
+            params["is_archived"] = is_archived
+            
+        if formats:
+            for i, f in enumerate(formats):
+                params[f"formats[{i}]"] = f
 
-        result = self._request("GET", "/adv/campaigns", params=params or None)
-        data = self._extract_data(result)
-        return data if isinstance(data, list) else []
+        result = self._request("GET", "/adv/campaigns", params=params)
+        campaigns = self._extract_data(result)
+        
+        if not isinstance(campaigns, list):
+            return []
+        
+        # Sort by ID descending (newest first)
+        campaigns.sort(key=lambda x: x.get('id', 0), reverse=True)
+        
+        # Apply limit
+        return campaigns[:limit]
 
     def get_campaign(self, campaign_id: int) -> dict[str, Any]:
         """Get campaign details by ID."""
@@ -168,22 +210,32 @@ class PropellerAdsClient:
 
     def get_statistics(
         self,
-        date_from: str | None = None,
-        date_to: str | None = None,
+        day_from: str | None = None,
+        day_to: str | None = None,
         group_by: list[str] | None = None,
         campaign_id: int | None = None,
         zone_id: int | None = None,
+        tz: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Get performance statistics."""
+        """Get performance statistics.
+        
+        Args:
+            day_from: Start date in YYYY-MM-DD format (EST timezone)
+            day_to: End date in YYYY-MM-DD format (EST timezone)
+            group_by: Fields to group by (campaign_id, zone_id, date_time, etc.)
+            campaign_id: Filter by campaign ID
+            zone_id: Filter by zone ID  
+            tz: UTC offset (e.g., '+0300', '-0500') - optional
+        """
         # Default to last 7 days
-        if not date_from:
-            date_from = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        if not date_to:
-            date_to = datetime.now().strftime("%Y-%m-%d")
+        if not day_from:
+            day_from = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        if not day_to:
+            day_to = datetime.now().strftime("%Y-%m-%d")
 
         params: dict[str, Any] = {
-            "date_from": date_from,
-            "date_to": date_to,
+            "day_from": day_from,
+            "day_to": day_to,
         }
 
         if group_by:
@@ -191,9 +243,11 @@ class PropellerAdsClient:
                 params[f"group_by[{i}]"] = gb
 
         if campaign_id:
-            params["campaign_id"] = campaign_id
+            params[f"campaign_id[0]"] = campaign_id
         if zone_id:
-            params["zone_id"] = zone_id
+            params[f"zone_id[0]"] = zone_id
+        if tz:
+            params["tz"] = tz
 
         result = self._request("GET", "/adv/statistics", params=params)
         data = self._extract_data(result)
@@ -202,13 +256,13 @@ class PropellerAdsClient:
     def get_campaign_statistics(
         self,
         campaign_id: int,
-        date_from: str | None = None,
-        date_to: str | None = None,
+        day_from: str | None = None,
+        day_to: str | None = None,
     ) -> dict[str, Any]:
         """Get statistics for a specific campaign."""
         stats = self.get_statistics(
-            date_from=date_from,
-            date_to=date_to,
+            day_from=day_from,
+            day_to=day_to,
             campaign_id=campaign_id,
         )
         return stats[0] if stats else {}
@@ -216,14 +270,14 @@ class PropellerAdsClient:
     def get_zone_statistics(
         self,
         campaign_id: int | None = None,
-        date_from: str | None = None,
-        date_to: str | None = None,
+        day_from: str | None = None,
+        day_to: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Get statistics grouped by zone."""
         stats = self.get_statistics(
-            date_from=date_from,
-            date_to=date_to,
+            day_from=day_from,
+            day_to=day_to,
             group_by=["zone_id"],
             campaign_id=campaign_id,
         )
@@ -232,13 +286,13 @@ class PropellerAdsClient:
     def get_creative_statistics(
         self,
         campaign_id: int | None = None,
-        date_from: str | None = None,
-        date_to: str | None = None,
+        day_from: str | None = None,
+        day_to: str | None = None,
     ) -> list[dict[str, Any]]:
         """Get statistics grouped by creative."""
         return self.get_statistics(
-            date_from=date_from,
-            date_to=date_to,
+            day_from=day_from,
+            day_to=day_to,
             group_by=["creative_id"],
             campaign_id=campaign_id,
         )
