@@ -98,24 +98,17 @@ class PropellerAdsClient:
             params["name"] = name
 
         result = self._request("GET", "/adv/campaigns", params=params or None)
-        # PropellerAds API uses "result" key, not "data"
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result if isinstance(result, list) else []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_campaign(self, campaign_id: int) -> dict[str, Any]:
         """Get campaign details by ID."""
         result = self._request("GET", f"/adv/campaigns/{campaign_id}")
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def create_campaign(self, campaign_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new campaign."""
         result = self._request("POST", "/adv/campaigns", json_data=campaign_data)
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def update_campaign(
         self, campaign_id: int, updates: dict[str, Any]
@@ -124,9 +117,7 @@ class PropellerAdsClient:
         result = self._request(
             "PUT", f"/adv/campaigns/{campaign_id}", json_data=updates
         )
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def start_campaigns(self, campaign_ids: list[int]) -> dict[str, Any]:
         """Start (activate) campaigns."""
@@ -152,9 +143,7 @@ class PropellerAdsClient:
         result = self._request(
             "POST", f"/adv/campaigns/{campaign_id}/clone", json_data=data or None
         )
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     # ========== Statistics Methods ==========
 
@@ -176,7 +165,6 @@ class PropellerAdsClient:
         params: dict[str, Any] = {
             "date_from": date_from,
             "date_to": date_to,
-            "period": "daily",  # Use daily period to avoid timezone requirement
         }
 
         if group_by:
@@ -189,9 +177,7 @@ class PropellerAdsClient:
             params["zone_id"] = zone_id
 
         result = self._request("GET", "/adv/statistics", params=params)
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result if isinstance(result, list) else []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_campaign_statistics(
         self,
@@ -248,23 +234,17 @@ class PropellerAdsClient:
             params["campaign_id"] = campaign_id
 
         result = self._request("GET", "/adv/creatives", params=params or None)
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result if isinstance(result, list) else []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_creative(self, creative_id: int) -> dict[str, Any]:
         """Get creative details."""
         result = self._request("GET", f"/adv/creatives/{creative_id}")
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def create_creative(self, creative_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new creative."""
         result = self._request("POST", "/adv/creatives", json_data=creative_data)
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def update_creative(
         self, creative_id: int, updates: dict[str, Any]
@@ -273,9 +253,7 @@ class PropellerAdsClient:
         result = self._request(
             "PUT", f"/adv/creatives/{creative_id}", json_data=updates
         )
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     # ========== Targeting Methods ==========
 
@@ -286,9 +264,7 @@ class PropellerAdsClient:
             params["campaign_id"] = campaign_id
 
         result = self._request("GET", "/adv/zones", params=params or None)
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result if isinstance(result, list) else []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def add_zones_to_whitelist(
         self, campaign_id: int, zone_ids: list[int]
@@ -335,22 +311,17 @@ class PropellerAdsClient:
     def get_balance(self) -> dict[str, Any]:
         """Get account balance."""
         result = self._request("GET", "/adv/balance")
-        # Balance returns just a string, so return as-is
-        return result
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_countries(self) -> list[dict[str, Any]]:
         """Get available countries for targeting."""
         result = self._request("GET", "/adv/countries")
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result if isinstance(result, list) else []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_ad_formats(self) -> list[dict[str, Any]]:
         """Get available ad formats."""
         result = self._request("GET", "/adv/ad-formats")
-        if isinstance(result, dict):
-            return result.get("result", result.get("data", result))
-        return result if isinstance(result, list) else []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def close(self):
         """Close the HTTP client."""
