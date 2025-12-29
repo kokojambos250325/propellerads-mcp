@@ -37,8 +37,20 @@ STATUS_MAP = {
     4: "Ready",
     6: "Working",  # Active/Running
     7: "Paused",
-    8: "Stopped",  # Archived
-    9: "Completed"
+    8: "Stopped",  # Stopped/Archived
+    9: "Completed",
+}
+
+STATUS_NAME_TO_CODES: dict[str, list[int]] = {
+    "active": [6],
+    "working": [6],
+    "paused": [7],
+    "pending": [2],
+    "moderation": [2],
+    "rejected": [3],
+    "ready": [4],
+    "stopped": [8],
+    "completed": [9],
 }
 
 
@@ -95,7 +107,7 @@ class PropellerAdsClient:
 
     def _extract_data(self, result: Any) -> Any:
         """Extract data from API response.
-        
+
         PropellerAds API returns data in different formats:
         - {"result": [...]} for list endpoints
         - {"result": {...}} for single item endpoints
@@ -115,49 +127,69 @@ class PropellerAdsClient:
 
     def list_campaigns(
         self,
-        status: list[int] | None = None,
+        status: list[int] | int | str | None = None,
         is_archived: int | None = 0,
         limit: int = 20,
         formats: list[str] | None = None,
         page: int = 1,
         page_size: int = 100,
+        ad_format: str | None = None,
+        name: str | None = None,
     ) -> list[dict[str, Any]]:
         """List campaigns with optional filters.
-        
+
         Args:
-            status: List of status codes (1=Draft, 2=Moderation, 3=Rejected, 
-                    4=Ready, 6=Working, 7=Paused, 8=Stopped, 9=Completed)
+            status: Status filter. Can be:
+                - list of numeric status codes
+                - single numeric status code
+                - status name ("active", "paused", "pending", "rejected", etc.)
             is_archived: 0=not archived, 1=archived, None=all
             limit: Maximum number of campaigns to return (applied after sorting)
             formats: List of ad formats to filter
             page: Page number for API pagination
             page_size: Page size for API pagination (max 100)
+            ad_format: Legacy single ad format (ignored, kept for compatibility)
+            name: Legacy name filter (ignored, kept for compatibility)
         """
-        params = {
+        params: dict[str, Any] = {
             "page": page,
-            "page_size": min(page_size, 100)  # API max is 100
+            "page_size": min(page_size, 100),  # API max is 100
         }
-        
+
+        # Normalize status argument to list[int]
+        status_codes: list[int] | None = None
         if status:
-            for i, s in enumerate(status):
+            if isinstance(status, list):
+                status_codes = [int(s) for s in status]
+            elif isinstance(status, int):
+                status_codes = [status]
+            elif isinstance(status, str):
+                # Map human-readable status name to codes
+                status_codes = STATUS_NAME_TO_CODES.get(status.lower())
+
+        if status_codes:
+            for i, s in enumerate(status_codes):
                 params[f"status[{i}]"] = s
-        
+
         if is_archived is not None:
             params["is_archived"] = is_archived
-            
+
         if formats:
             for i, f in enumerate(formats):
                 params[f"formats[{i}]"] = f
 
+        # NOTE: "name" and "ad_format" are currently ignored because
+        # the public campaigns API does not support these filters directly.
+
         result = self._request("GET", "/adv/campaigns", params=params)
         campaigns = self._extract_data(result)
-        
+
         if not isinstance(campaigns, list):
             return []
-        
+
         # Sort by ID descending (newest first)
-        campaigns.sort(key=lambda x: x.get('id', 0), reverse=True)
-        
+        campaigns.sort(key=lambda x: x.get("id", 0), reverse=True)
+
         # Apply limit
         return campaigns[:limit]
 
@@ -218,13 +250,13 @@ class PropellerAdsClient:
         tz: str | None = None,
     ) -> list[dict[str, Any]]:
         """Get performance statistics.
-        
+
         Args:
             day_from: Start date in YYYY-MM-DD format (EST timezone)
             day_to: End date in YYYY-MM-DD format (EST timezone)
             group_by: Fields to group by (campaign_id, zone_id, date_time, etc.)
             campaign_id: Filter by campaign ID
-            zone_id: Filter by zone ID  
+            zone_id: Filter by zone ID
             tz: UTC offset (e.g., '+0300', '-0500') - optional
         """
         # Default to last 7 days
@@ -243,9 +275,9 @@ class PropellerAdsClient:
                 params[f"group_by[{i}]"] = gb
 
         if campaign_id:
-            params[f"campaign_id[0]"] = campaign_id
+            params["campaign_id[0]"] = campaign_id
         if zone_id:
-            params[f"zone_id[0]"] = zone_id
+            params["zone_id[0]"] = zone_id
         if tz:
             params["tz"] = tz
 
