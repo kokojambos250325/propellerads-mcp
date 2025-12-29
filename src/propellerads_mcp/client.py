@@ -57,7 +57,7 @@ class PropellerAdsClient:
         endpoint: str,
         params: dict[str, Any] | None = None,
         json_data: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """Make API request."""
         try:
             response = self.client.request(
@@ -98,14 +98,7 @@ class PropellerAdsClient:
             params["name"] = name
 
         result = self._request("GET", "/adv/campaigns", params=params or None)
-        
-        # Handle both dict and list responses
-        if isinstance(result, dict):
-            return result.get("data", [])
-        elif isinstance(result, list):
-            return result
-        else:
-            return []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_campaign(self, campaign_id: int) -> dict[str, Any]:
         """Get campaign details by ID."""
@@ -172,7 +165,7 @@ class PropellerAdsClient:
         params: dict[str, Any] = {
             "date_from": date_from,
             "date_to": date_to,
-            "period": "daily",
+            "period": "daily",  # Use daily period to avoid timezone requirement
         }
 
         if group_by:
@@ -185,14 +178,7 @@ class PropellerAdsClient:
             params["zone_id"] = zone_id
 
         result = self._request("GET", "/adv/statistics", params=params)
-        
-        # Handle both dict and list responses
-        if isinstance(result, dict):
-            return result.get("data", [])
-        elif isinstance(result, list):
-            return result
-        else:
-            return []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_campaign_statistics(
         self,
@@ -249,13 +235,7 @@ class PropellerAdsClient:
             params["campaign_id"] = campaign_id
 
         result = self._request("GET", "/adv/creatives", params=params or None)
-        
-        if isinstance(result, dict):
-            return result.get("data", [])
-        elif isinstance(result, list):
-            return result
-        else:
-            return []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_creative(self, creative_id: int) -> dict[str, Any]:
         """Get creative details."""
@@ -285,13 +265,7 @@ class PropellerAdsClient:
             params["campaign_id"] = campaign_id
 
         result = self._request("GET", "/adv/zones", params=params or None)
-        
-        if isinstance(result, dict):
-            return result.get("data", [])
-        elif isinstance(result, list):
-            return result
-        else:
-            return []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def add_zones_to_whitelist(
         self, campaign_id: int, zone_ids: list[int]
@@ -343,24 +317,12 @@ class PropellerAdsClient:
     def get_countries(self) -> list[dict[str, Any]]:
         """Get available countries for targeting."""
         result = self._request("GET", "/adv/countries")
-        
-        if isinstance(result, dict):
-            return result.get("data", [])
-        elif isinstance(result, list):
-            return result
-        else:
-            return []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def get_ad_formats(self) -> list[dict[str, Any]]:
         """Get available ad formats."""
         result = self._request("GET", "/adv/ad-formats")
-        
-        if isinstance(result, dict):
-            return result.get("data", [])
-        elif isinstance(result, list):
-            return result
-        else:
-            return []
+        return result.get("data", result) if isinstance(result, dict) else result
 
     def close(self):
         """Close the HTTP client."""
