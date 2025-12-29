@@ -165,6 +165,7 @@ class PropellerAdsClient:
         params: dict[str, Any] = {
             "date_from": date_from,
             "date_to": date_to,
+            "period": "daily",  # Use daily period to avoid timezone requirement
         }
 
         if group_by:
